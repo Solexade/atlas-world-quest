@@ -1,0 +1,14 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createStore} from '../server/store.js';
+import {startRound,answerRound,nextQuestion,leaderboard,dayOf} from '../server/game.js';
+import {RANKED} from '../server/questions.js';
+const wallet='0x1111111111111111111111111111111111111111';
+const now=Date.UTC(2026,8,26,12);
+async function fixture(t){const store=await createStore({filename:':memory:'});t.after(()=>store.close());return store;}
+async function correctChoice(store,address){const p=(await store.get(`player:${address}`)).value;const r=p.rounds.at(-1);const q=RANKED.find(q=>q.id===r.questions[r.index]);return r.orders[r.index].indexOf(q.answer);}
+test('only current question is public and daily start resumes one attempt',async t=>{const s=await fixture(t);const r=await startRound(s,wallet,now);assert.equal(r.question.options.length,4);assert.equal(r.question.answer,undefined);assert.equal(r.questions,undefined);assert.equal((await startRound(s,wallet,now)).id,r.id);});
+test('perfect expedition earns 650 once, persists stamps and reaches leaderboard',async t=>{const s=await fixture(t);let r=await startRound(s,wallet,now);for(let i=0;i<5;i++){r=await answerRound(s,wallet,{roundId:r.id,number:i+1,choice:await correctChoice(s,wallet)},now+1000);if(i<4)r=await nextQuestion(s,wallet,r.id,now+1000);}assert.equal(r.score,650);assert.equal(r.done,true);await answerRound(s,wallet,{roundId:r.id,number:5,choice:0},now+1000);const p=(await s.get(`player:${wallet}`)).value;assert.equal(p.total,650);assert.equal(p.completed,1);assert.ok(p.stamps.length>0);assert.equal((await leaderboard(s,'all',now))[0].points,650);});
+test('replayed and simultaneous answers cannot increase score twice',async t=>{const s=await fixture(t);const r=await startRound(s,wallet,now);const choice=await correctChoice(s,wallet);await Promise.all([1,2,3].map(()=>answerRound(s,wallet,{roundId:r.id,number:1,choice},now+1000)));const p=(await s.get(`player:${wallet}`)).value;assert.equal(p.rounds[0].index,1);assert.equal(p.rounds[0].score,110);assert.equal((await startRound(s,wallet,now)).question,null);});
+test('late correct answers score zero, feedback time does not consume next question',async t=>{const s=await fixture(t);const r=await startRound(s,wallet,now);const a=await answerRound(s,wallet,{roundId:r.id,number:1,choice:await correctChoice(s,wallet)},now+26000);assert.equal(a.score,0);assert.equal(a.feedback.timedOut,true);const n=await nextQuestion(s,wallet,r.id,now+200000);assert.equal(n.question.deadline,now+225000);});
+test('wallet cannot answer another player round and next UTC day gets new attempt',async t=>{const s=await fixture(t);const r=await startRound(s,wallet,now);await assert.rejects(answerRound(s,'0x2222222222222222222222222222222222222222',{roundId:r.id,number:1,choice:0},now));const next=await startRound(s,wallet,now+86400000);assert.notEqual(r.id,next.id);assert.equal(next.day,dayOf(now)+1);});

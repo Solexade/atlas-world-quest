@@ -1,0 +1,20 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import ganache from 'ganache';
+import {createPublicClient,createWalletClient,custom,keccak256,toBytes} from 'viem';
+import {privateKeyToAccount,generatePrivateKey} from 'viem/accounts';
+import {compile} from '../scripts/compile.js';
+import {receiptTypes} from '../server/receipt.js';
+test('score registry accepts authorized result and rejects duplicates and tampering',async t=>{
+ const provider=ganache.provider({chain:{chainId:46630},logging:{quiet:true}});t.after(()=>provider.disconnect());
+ const accounts=Object.values(provider.getInitialAccounts());const player=privateKeyToAccount(accounts[0].secretKey);const scorer=privateKeyToAccount(generatePrivateKey());
+ const transport=custom(provider),client=createPublicClient({transport}),wallet=createWalletClient({account:player,transport});
+ const artifact=compile();const tx=await wallet.deployContract({...artifact,args:[scorer.address],chain:null});const deployed=await client.waitForTransactionReceipt({hash:tx});const address=deployed.contractAddress;
+ const block=await client.getBlock();const message={player:player.address,roundId:keccak256(toBytes('test-round')),day:block.timestamp/86400n,points:650n,deadline:block.timestamp+3600n};
+ const signature=await scorer.signTypedData({domain:{name:'AtlasWorldQuest',version:'1',chainId:46630,verifyingContract:address},types:receiptTypes,primaryType:'Score',message});
+ const args=[message.roundId,message.day,message.points,message.deadline,signature];
+ await assert.rejects(client.simulateContract({address,abi:artifact.abi,functionName:'recordScore',args:[message.roundId,message.day,649n,message.deadline,signature],account:player}));
+ const sent=await wallet.writeContract({address,abi:artifact.abi,functionName:'recordScore',args,chain:null});await client.waitForTransactionReceipt({hash:sent});
+ assert.equal(await client.readContract({address,abi:artifact.abi,functionName:'totalPoints',args:[player.address]}),650n);
+ await assert.rejects(client.simulateContract({address,abi:artifact.abi,functionName:'recordScore',args,account:player}));
+});

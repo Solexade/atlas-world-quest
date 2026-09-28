@@ -57,7 +57,7 @@ export function createHandler({storeProvider=getStore,env=process.env}={}) {
         const ip=config.production?req.headers['x-vercel-forwarded-for']||req.socket?.remoteAddress||'unknown':req.socket?.remoteAddress||'local';
         await limit(store,createHash('sha256').update(String(ip)).digest('hex'),20,60000);
         await store.prune();
-        const result=await challenge(store,body.address,config.origin);
+        const result=await challenge(store,body.address,config.origin,Date.now(),body.chainId);
         res.setHeader('Set-Cookie',cookie('atlas_nonce',result.nonce,300,secure));return send(result);
       }
       if(path==='/api/auth/verify'){

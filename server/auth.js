@@ -21,8 +21,8 @@ export async function verifyLogin(store,nonce,signature,now=Date.now()) {
   if(!valid)fail('Wallet signature did not match.',401);
   return entry.address;
 }
-export function sessionToken(address,secret,now=Date.now()) {
-  const payload=Buffer.from(JSON.stringify({address,exp:now+86400000})).toString('base64url');
+export function sessionToken(address,secret,now=Date.now(),ttl=86400000) {
+  const payload=Buffer.from(JSON.stringify({address,exp:now+ttl})).toString('base64url');
   return `${payload}.${createHmac('sha256',secret).update(payload).digest('base64url')}`;
 }
 export function readSession(token,secret,now=Date.now()) {
@@ -31,7 +31,7 @@ export function readSession(token,secret,now=Date.now()) {
     const expected=createHmac('sha256',secret).update(payload).digest();const actual=Buffer.from(sig,'base64url');
     if(actual.length!==expected.length||!timingSafeEqual(actual,expected))return null;
     const data=JSON.parse(Buffer.from(payload,'base64url'));
-    return data.exp>now&&/^0x[a-f0-9]{40}$/.test(data.address)?data.address:null;
+    return data.exp>now&&/^(?:0x[a-f0-9]{40}|guest:[a-f0-9]{64})$/.test(data.address)?data.address:null;
   }catch{return null;}
 }
 export function cookies(req) {return Object.fromEntries((req.headers.cookie||'').split(';').map(v=>{const at=v.indexOf('=');return [v.slice(0,at).trim(),v.slice(at+1)];}));}

@@ -65,9 +65,9 @@ export async function nextQuestion(store,address,roundId,now=Date.now()) {
   });
 }
 export function passport(p,now=Date.now()) {
-  return {address:p.address,total:p.total,completed:p.completed,stamps:p.stamps,rounds:p.rounds.filter(r=>r.done).slice(-7).reverse().map(r=>({id:r.id,day:r.day,score:r.score,correct:r.correct})),today:p.rounds.find(r=>r.day===dayOf(now))?.done||false};
+  return {address:p.address,name:p.name||null,total:p.total,completed:p.completed,stamps:p.stamps,rounds:p.rounds.filter(r=>r.done).slice(-7).reverse().map(r=>({id:r.id,day:r.day,score:r.score,correct:r.correct})),today:p.rounds.find(r=>r.day===dayOf(now))?.done||false};
 }
 export async function leaderboard(store,period,now=Date.now()) {
   const players=await store.players();const week=weekOf(now);
-  return players.map(p=>({address:p.address,points:period==='all'?p.total:p.rounds.filter(r=>r.done&&r.day>=week).reduce((s,r)=>s+r.score,0),completed:period==='all'?p.completed:p.rounds.filter(r=>r.done&&r.day>=week).length})).filter(p=>p.completed>0).sort((a,b)=>b.points-a.points||a.address.localeCompare(b.address)).slice(0,100).map((p,i)=>({...p,rank:i+1}));
+  return players.map(p=>({address:p.address,name:p.name||null,points:period==='all'?p.total:p.rounds.filter(r=>r.done&&r.day>=week).reduce((s,r)=>s+r.score,0),completed:period==='all'?p.completed:p.rounds.filter(r=>r.done&&r.day>=week).length})).filter(p=>p.completed>0).sort((a,b)=>b.points-a.points||a.address.localeCompare(b.address)).slice(0,100).map((p,i)=>({...p,rank:i+1}));
 }

@@ -1,0 +1,15 @@
+import React,{useEffect,useRef,useState} from 'react';
+import {api} from './api.js';
+export function ExplorerEntry({onSuccess,onClose}){
+ const dialog=useRef(null),[mode,setMode]=useState('create'),[name,setName]=useState(''),[key,setKey]=useState(''),[backup,setBackup]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[copied,setCopied]=useState(false);
+ useEffect(()=>{const node=dialog.current;node.showModal();return()=>node.close();},[]);
+ async function submit(e){e.preventDefault();if(busy)return;setBusy(true);setError('');try{
+  const result=await api(mode==='create'?'auth/create':'auth/recover',mode==='create'?{name}:{recoveryCode:key.trim()});
+  await onSuccess();if(result.recoveryCode)setBackup(result.recoveryCode);else onClose();
+ }catch(e){setError(e.message);}finally{setBusy(false);}}
+ return <dialog className="wallet-dialog explorer-dialog" ref={dialog} onCancel={onClose} aria-labelledby="explorer-title"><button className="dialog-close" onClick={onClose}>Close</button><span className="eyebrow">YOUR NEXT ADVENTURE STARTS HERE</span><h2 id="explorer-title">{backup?'Your passport is ready.':mode==='create'?'What should we call you?':'Bring your passport back.'}</h2>
+ {backup?<><p>Your progress saves automatically in this browser. Keep this private code somewhere safe to restore it on another device or after clearing cookies.</p><label className="recovery-label">Private recovery code<input readOnly value={backup} onFocus={e=>e.target.select()}/></label><button className="outline" onClick={async()=>{try{await navigator.clipboard.writeText(backup);setCopied(true);}catch{setError('Select the code and copy it manually.');}}}>{copied?'Copied':'Copy private code'}</button><p className="subtle">Treat this like a password. Your username alone cannot restore your account. This code is shown once.</p><button className="primary" onClick={onClose}>LET’S EXPLORE ↗</button></>:<form onSubmit={submit}>
+ {mode==='create'?<><p>Pick an explorer name. No wallet, email or sign-in required. Your scores and stamps save automatically.</p><label className="recovery-label">Explorer name<input required minLength={3} maxLength={20} pattern="[a-zA-Z0-9][a-zA-Z0-9 _\-]{2,19}" autoComplete="nickname" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Solex the explorer"/></label><p className="subtle">Your name and scores are public. Names are not unique; each passport has its own private identity.</p></>:<><p>Use the private code saved when you created your passport.</p><label className="recovery-label">Private recovery code<input required autoComplete="off" spellCheck={false} value={key} onChange={e=>setKey(e.target.value)} placeholder="AQ-…" type="password"/></label></>}
+ <button className="primary" disabled={busy}>{busy?'Preparing…':mode==='create'?'CREATE MY PASSPORT ↗':'RESTORE PROGRESS ↗'}</button><button type="button" className="text-button" onClick={()=>{setMode(mode==='create'?'recover':'create');setError('');}}>{mode==='create'?'Already played? Restore progress':'Start with a new explorer name'}</button></form>}
+ {error&&<p role="alert">{error}</p>}</dialog>;
+}

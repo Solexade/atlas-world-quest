@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-export async function createStore({url = process.env.DATABASE_URL, filename = 'data/world-quest.sqlite'} = {}) {
+export async function createStore({url = process.env.DATABASE_URL, filename = process.env.DATA_FILE || 'data/world-quest.sqlite'} = {}) {
   if (url) {
     const { default: pg } = await import('pg');
     const pool = new pg.Pool({connectionString:url, max:3, idleTimeoutMillis:10000, connectionTimeoutMillis:10000});

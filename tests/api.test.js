@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {createHandler} from '../server/api.js';
 import {createStore} from '../server/store.js';
-import {RANKED} from '../server/questions.js';
+import {LEVEL_QUESTIONS as RANKED} from '../server/levels.js';
 import {createExplorer,recoverExplorer} from '../server/guest-auth.js';
 import {sessionToken} from '../server/auth.js';
 
@@ -15,6 +15,8 @@ test('username passport, recovery, private cookies and persistent server scores'
  const base=`http://127.0.0.1:${server.address().port}/api/`;let jar='';
  async function call(path,data,origin=env.APP_ORIGIN){const r=await fetch(base+path,{method:data===undefined?'GET':'POST',headers:{Origin:origin,'Content-Type':'application/json',Cookie:jar},body:data===undefined?undefined:JSON.stringify(data)});const set=r.headers.getSetCookie();if(set.length){assert.ok(set.every(c=>c.includes('HttpOnly')&&c.includes('SameSite=Strict')));jar=set.map(c=>c.split(';')[0]).join('; ');}return {status:r.status,body:await r.json()};}
  assert.equal((await call('config')).body.authProvider,'guest');
+ const practice=(await call('practice')).body.questions;assert.equal(practice.length,5);assert.ok(practice.every(q=>!('answer' in q)&&!('explanation' in q)));
+ const feedback=(await call('practice',{id:practice[0].id,choice:0})).body;assert.deepEqual(Object.keys(feedback),['correct']);
  assert.equal((await call('round/start',{})).status,401);
  assert.equal((await call('auth/challenge',{address:'0x123'})).status,410);
  assert.equal((await call('auth/create',{name:'Explorer'},'https://evil.test')).status,403);
@@ -26,6 +28,7 @@ test('username passport, recovery, private cookies and persistent server scores'
  for(let i=0;i<5;i++){
   const q=RANKED.find(q=>q.id===round.question.id),choice=round.question.options.indexOf(q.options[q.answer]);
   round=(await call('round/answer',{roundId:round.id,number:round.question.number,choice,score:999999})).body;
+  assert.equal(round.feedback.answer,undefined);assert.equal(round.feedback.explanation,undefined);
   if(i<4)round=(await call('round/next',{roundId:round.id})).body;
  }
  assert.equal(round.score,650);assert.equal((await call('me')).body.player.total,650);
@@ -35,7 +38,7 @@ test('username passport, recovery, private cookies and persistent server scores'
  await call('auth/logout',{});assert.equal((await call('me')).body.player,null);
  assert.equal((await call('auth/recover',{recoveryCode:'Voyager One'})).status,401);
  assert.equal((await call('auth/recover',{recoveryCode:recovery})).status,200);
- assert.equal((await call('me')).body.player.total,650);assert.equal((await call('round/start',{})).body.id,round.id);
+ assert.equal((await call('me')).body.player.total,650);assert.equal((await call('round/start',{})).body.level,2);assert.equal((await call('me')).body.player.progress.cleared[0],1);
  jar='atlas_session='+sessionToken('0x'+'a'.repeat(40),env.SESSION_SECRET);assert.equal((await call('me')).body.player,null);
 });
 test('same username cannot claim another passport; recovery requires its private secret',async()=>{

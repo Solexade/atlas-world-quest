@@ -9,13 +9,14 @@ async function call(path,data){
  assert.match(res.headers.get('content-type')||'',/application\/json/,`${path}: expected JSON, HTTP ${res.status}`);
  const result=await res.json();console.log(path,res.status);return {status:res.status,result};
 }
-assert.equal((await call('config')).result.rankedReady,true);
+const config=(await call('config')).result;assert.equal(config.rankedReady,true);assert.equal(config.authProvider,'guest');assert.equal(config.levels.length,10);
+const practice=(await call('practice')).result.questions;assert.ok(practice.every(q=>!('answer' in q)&&!('explanation' in q)));
 assert.equal((await call('round/start',{})).status,401);
 const created=await call('auth/create',{name:'Release Check'});assert.equal(created.status,200);
 const recoveryCode=created.result.recoveryCode;assert.match(recoveryCode,/^AQ-[a-f0-9]{64}$/);
 const me=await call('me');assert.equal(me.result.player.name,'Release Check');const identity=me.result.player.address;
 const first=await call('round/start',{});assert.equal(first.status,200);assert.equal(first.result.question.answer,undefined);
-const answered=await call('round/answer',{roundId:first.result.id,number:1,choice:-1});assert.equal(answered.status,200);assert.equal(answered.result.score,0);
+const answered=await call('round/answer',{roundId:first.result.id,number:1,choice:-1});assert.equal(answered.status,200);assert.equal(answered.result.score,0);assert.equal(answered.result.feedback.answer,undefined);assert.equal(answered.result.feedback.explanation,undefined);
 assert.equal((await call('auth/logout',{})).status,200);assert.equal((await call('me')).result.player,null);
 assert.equal((await call('auth/recover',{recoveryCode})).status,200);
 assert.equal((await call('me')).result.player.address,identity);

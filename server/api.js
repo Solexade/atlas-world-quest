@@ -1,7 +1,8 @@
 import { randomBytes,createHash } from 'node:crypto';
 import { createStore } from './store.js';
 import { sessionToken,readSession,cookies,cookie } from './auth.js';
-import { startRound,answerRound,nextQuestion,leaderboard,passport,fail } from './game.js';
+import { startRound,startLevel,answerRound,nextQuestion,leaderboard,passport,fail } from './game.js';
+import {LEVELS} from './levels.js';
 import { PRACTICE } from './questions.js';
 import {createExplorer,recoverExplorer} from './guest-auth.js';
 let storePromise;
@@ -33,9 +34,16 @@ export function createHandler({storeProvider=getStore,env=process.env}={}) {
     try{
       const path=new URL(req.url,'http://internal').pathname.replace(/\/$/,'');
       const config=configuration(env);
-      if(path==='/api/config'&&req.method==='GET')return send({rankedReady:config.ready,authProvider:'guest',onchainReady:false,chainId:46630,local:!config.production,faucet:'https://faucet.testnet.chain.robinhood.com/'});
-      if(path==='/api/practice'&&req.method==='GET')return send({questions:PRACTICE});
+      if(path==='/api/config'&&req.method==='GET')return send({rankedReady:config.ready,authProvider:'guest',levels:LEVELS,onchainReady:false,chainId:46630,local:!config.production,faucet:'https://faucet.testnet.chain.robinhood.com/'});
+      if(path==='/api/practice'&&req.method==='GET')return send({questions:PRACTICE.map(({answer,explanation,...q})=>q)});
       if(!['GET','POST'].includes(req.method))fail('Method not allowed.',405);
+      if(path==='/api/practice'&&req.method==='POST'){
+        if(req.headers.origin!==config.origin)fail('This request must come from the game site.',403);
+        if(!String(req.headers['content-type']||'').startsWith('application/json'))fail('JSON is required.',415);
+        const input=await bodyOf(req),q=PRACTICE.find(q=>q.id===input.id);
+        if(!q||!Number.isInteger(input.choice)||input.choice< -1||input.choice>3)fail('Invalid practice answer.');
+        return send({correct:input.choice===q.answer});
+      }
       if(!config.ready)fail('Ranked play is being configured. Practice is open now.',503);
       if(req.method==='POST'&&req.headers.origin!==config.origin)fail('This request must come from the game site.',403);
       if(req.method==='POST'&&!String(req.headers['content-type']||'').startsWith('application/json'))fail('JSON is required.',415);
@@ -68,7 +76,7 @@ export function createHandler({storeProvider=getStore,env=process.env}={}) {
       }
       if(!address)fail('Choose an explorer name to save ranked scores.',401);
       await limit(store,address,60,60000);
-      if(path==='/api/round/start')return send(await startRound(store,address));
+      if(path==='/api/round/start')return send(await startLevel(store,address,body.level));
       if(path==='/api/round/answer')return send(await answerRound(store,address,body));
       if(path==='/api/round/next')return send(await nextQuestion(store,address,body.roundId));
       if(path==='/api/round/receipt')fail('Onchain recording is disabled. Your score is saved to your account.',410);

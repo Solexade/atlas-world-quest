@@ -1,0 +1,19 @@
+import React,{useState} from 'react';
+import {CREW,companion,reaction} from './crew.js';
+import './crew.css';
+
+export function useCompanion(){
+ const [id,setId]=useState(()=>{try{return companion(localStorage.getItem('atlas.crew.v1')).id;}catch{return CREW[0].id;}});
+ return [companion(id),v=>{setId(v.id);try{localStorage.setItem('atlas.crew.v1',String(v.id));}catch{}}];
+}
+export function Portrait({viber,className=''}){
+ const [failed,setFailed]=useState(false);
+ return failed?<span className={`viber-placeholder ${className}`} aria-label={viber.name}>{viber.name.slice(0,1)}</span>:<img className={`viber-portrait ${className}`} src={viber.image} alt={`${viber.name}, Vibe Viber ${viber.id}`} width="480" height="480" loading="lazy" onError={()=>setFailed(true)}/>;
+}
+export function CrewHero({selected}){return <figure className="crew-hero"><div className="crew-orbit"><span>ATLAS × COMMUNITY CREATIVITY</span><img src="/world_discovery.png" alt="An illustrated world of landmarks and explorer trails"/><div className="orbit-viber orbit-one"><Portrait viber={CREW[7]}/></div><div className="orbit-viber orbit-two"><Portrait viber={CREW[5]}/></div><div className="orbit-viber orbit-three"><Portrait key={selected.id} viber={selected}/></div></div><figcaption><span className="crew-live"/> YOUR CREW. A WHOLE WORLD TO DISCOVER.</figcaption></figure>;}
+export function CrewPicker({selected,onSelect}){
+ const [talk,setTalk]=useState(false);
+ return <section className="crew-section" aria-labelledby="crew-title"><div className="section-heading"><div><span className="eyebrow">MEET YOUR EXPEDITION CREW</span><h2 id="crew-title">Big personalities. Bigger adventures.</h2></div><a href="https://testnet.vibevibe.fun/vibe-vibers/for-raiders" target="_blank" rel="noreferrer">Meet the Vibe Vibers ↗</a></div><p className="subtle">Pick a companion. Meet a different host along the route. Celebrate every discovery together.</p><div className="crew-selection"><Portrait key={selected.id} viber={selected}/><div><span className="eyebrow">YOUR COMPANION · {selected.role}</span><h3>{selected.name}</h3><p role="status">{talk?selected.greeting:'Ready when you are. Choose your crew, then start an expedition.'}</p><button className="text-button" onClick={()=>setTalk(v=>!v)}>{talk?'Back to briefing':'Say hello'} ↗</button></div><span className="crew-tag">SAVED ON THIS DEVICE</span></div><div className="crew-grid" aria-label="Choose your Viber companion">{CREW.map(v=><button key={v.id} className={selected.id===v.id?'crew-tile chosen':'crew-tile'} aria-pressed={selected.id===v.id} onClick={()=>{onSelect(v);setTalk(false);}}><Portrait viber={v}/><span>{v.name}<small>{v.role}</small></span><b aria-hidden="true">{selected.id===v.id?'✓':'+'}</b></button>)}</div><p className="crew-credit">Vibe Vibers artwork from the official raider gallery. ATLAS-created names, roles and scripted dialogue; not autonomous AI agents or an official partnership. Companion selection does not change points or rewards.</p></section>;
+}
+export function HostBriefing({host,buddy,number}){return <aside className="host-briefing"><Portrait key={host.id} viber={host}/><div><span className="eyebrow">YOUR QUESTION HOST · {host.role}</span><h3>{host.name}<span> / STOP {number}</span></h3><p>{host.greeting}</p></div><div className="buddy-chip"><Portrait key={buddy.id} viber={buddy}/><span>{buddy.name}<small>CHEERING YOU ON</small></span></div></aside>;}
+export function CrewReaction({host,buddy,correct,number}){return <div className={`crew-reaction ${correct?'crew-cheer':''}`}><div className="cheer-stage" aria-hidden="true"><Portrait viber={host}/><Portrait viber={buddy}/>{correct&&Array.from({length:16},(_,i)=><i key={i} style={{'--i':i}}/>)}</div><h3>{reaction(correct,number)}</h3><p>{correct?'Your crew celebrates. Continue whenever you’re ready.':'Your crew is still with you. The answer stays hidden.'}</p></div>;}
